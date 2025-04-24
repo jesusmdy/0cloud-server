@@ -4,12 +4,9 @@ from routes.auth import require_jwt
 
 folders_bp = Blueprint('folders', __name__)
 
-@folders_bp.route('/folders', methods=['POST', 'OPTIONS'])
+@folders_bp.route('/folders', methods=['POST'])
 @require_jwt
 def create_folder_route():
-    if request.method == 'OPTIONS':
-        return '', 204
-        
     try:
         # Get JSON payload
         data = request.get_json()
@@ -73,12 +70,9 @@ def get_folder_route(folder_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@folders_bp.route('/folders/<folder_id>/contents', methods=['GET', 'OPTIONS'])
+@folders_bp.route('/folders/<folder_id>/contents', methods=['GET'])
 @require_jwt
 def list_contents(folder_id):
-    if request.method == 'OPTIONS':
-        return '', 204
-        
     try:
         # Handle root folder (folder_id = 0)
         if folder_id == '0':
@@ -87,10 +81,11 @@ def list_contents(folder_id):
                     'id': '0',
                     'name': 'root',
                     'parent_id': None,
-                    'created_at': None
+                    'created_at': None,
+                    'user_id': g.user['user_id']
                 },
                 'parent': None,
-                'files': list_files(parent_id=None, user_id=g.user['user_id'])['files'],
+                'files': list_files(parent_id=None, user_id=g.user['user_id']),
                 'folders': list_folders(parent_id=None, user_id=g.user['user_id'])
             })
             
@@ -100,6 +95,8 @@ def list_contents(folder_id):
             return jsonify({'error': 'Folder not found'}), 404
             
         # Check if the folder belongs to the user
+        print(f"Folder: {folder}")
+        print(f"User ID: {g.user['user_id']}")
         if folder['user_id'] != g.user['user_id']:
             return jsonify({'error': 'Unauthorized access to folder'}), 403
             
@@ -112,13 +109,13 @@ def list_contents(folder_id):
                 parent = None  # Don't show parent if not owned by user
             
         # Get files and folders in this folder for the current user
-        files_result = list_files(parent_id=folder_id, user_id=g.user['user_id'])
+        files = list_files(parent_id=folder_id, user_id=g.user['user_id'])
         folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
         
         return jsonify({
             'folder': folder,
             'parent': parent,
-            'files': files_result['files'],
+            'files': files,
             'folders': folders
         })
         

@@ -66,8 +66,7 @@ def require_jwt(f):
         
         # Get token from Authorization header
         auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
+        token = auth_header
             
         if not token:
             return jsonify({'error': 'Missing token'}), 401
@@ -214,11 +213,8 @@ def register():
         print(f"Registration error: {str(e)}")  # Debug print
         return jsonify({'error': str(e)}), 500
 
-@auth_bp.route('/login', methods=['POST', 'OPTIONS'])
+@auth_bp.route('/login', methods=['POST'])
 def login():
-    if request.method == 'OPTIONS':
-        return '', 204
-        
     try:
         # Get JSON payload
         data = request.get_json()

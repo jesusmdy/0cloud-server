@@ -11,11 +11,9 @@ from routes.auth import require_jwt
 
 encrypt_bp = Blueprint('encrypt', __name__)
 
-@encrypt_bp.route('/files/encrypt', methods=['POST', 'OPTIONS'])
+@encrypt_bp.route('/files/encrypt', methods=['POST'])
 @require_jwt
 def encrypt_file():
-    if request.method == 'OPTIONS':
-        return '', 204
         
     try:
         # Get the file from the request

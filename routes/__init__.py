@@ -5,7 +5,7 @@ from .list import list_bp
 from .folders import folders_bp
 from .files import files_bp
 from .auth import auth_bp
-
+from .user import user_bp
 # Create main blueprint
 api_bp = Blueprint('api', __name__)
 
@@ -16,3 +16,4 @@ api_bp.register_blueprint(list_bp)
 api_bp.register_blueprint(folders_bp)
 api_bp.register_blueprint(files_bp)
 api_bp.register_blueprint(auth_bp) 
+api_bp.register_blueprint(user_bp)

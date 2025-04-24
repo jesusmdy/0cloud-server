@@ -196,6 +196,20 @@ def delete_file(file_id):
     finally:
         conn.close()
 
+def count_user_filesize(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT SUM(file_size) FROM files WHERE user_id = ?
+        ''', (user_id,))
+        
+        result = c.fetchone()
+        return result[0] if result[0] else 0
+    finally:
+        conn.close()
+
 def list_files(search_term='', limit=None, offset=None, parent_id=None, user_id=None):
     """List all files with optional search, pagination and parent folder filtering"""
     conn = sqlite3.connect(DB_PATH)
@@ -241,9 +255,7 @@ def list_files(search_term='', limit=None, offset=None, parent_id=None, user_id=
         c.execute(query, params)
         rows = c.fetchall()
         
-        return {
-            'total': total,
-            'files': [{
+        return [{
                 'id': row[0],
                 'encrypted_filename': row[1],
                 'original_filename': row[2],
@@ -253,7 +265,6 @@ def list_files(search_term='', limit=None, offset=None, parent_id=None, user_id=
                 'mime_type': row[6],
                 'user_id': row[7]
             } for row in rows]
-        }
     finally:
         conn.close()
 
@@ -301,7 +312,7 @@ def get_folder(folder_id):
     
     try:
         c.execute('''
-            SELECT id, name, parent_id, created_at
+            SELECT id, name, parent_id, created_at, user_id
             FROM folders
             WHERE id = ?
         ''', (folder_id,))
@@ -312,7 +323,8 @@ def get_folder(folder_id):
                 'id': row[0],
                 'name': row[1],
                 'parent_id': row[2],
-                'created_at': row[3]
+                'created_at': row[3],
+                'user_id': row[4]
             }
         return None
     finally:
