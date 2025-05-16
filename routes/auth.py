@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, g
 from rdb.user import user_exists_by_email, get_user_by_email, get_user, save_user
-from crypto.keys import generate_key_from_password, create_jwt_token, verify_jwt_token, require_jwt
+from crypto.keys import generate_key_from_password
+from crypto.token import create_jwt_token, verify_jwt_token
 import base64
 from cryptography.fernet import Fernet
 

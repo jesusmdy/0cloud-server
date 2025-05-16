@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from database import list_files
-from routes.auth import require_jwt
+from crypto.token import require_jwt
 
 list_bp = Blueprint('list', __name__)
 

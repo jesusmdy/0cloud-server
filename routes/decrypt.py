@@ -4,7 +4,7 @@ import base64
 import traceback
 import os
 from cryptography.fernet import Fernet
-from routes.auth import require_jwt
+from crypto.token import require_jwt
 
 decrypt_bp = Blueprint('decrypt', __name__)
 

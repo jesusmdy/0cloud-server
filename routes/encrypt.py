@@ -7,7 +7,7 @@ import base64
 from file_tools import load_key
 from database import save_file
 import mimetypes
-from routes.auth import require_jwt
+from crypto.token import require_jwt
 
 encrypt_bp = Blueprint('encrypt', __name__)
 

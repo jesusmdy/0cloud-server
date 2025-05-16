@@ -1,8 +1,14 @@
 from flask import Blueprint, request, jsonify, g
-from database import create_folder, get_folder, list_folders, list_files, list_all_files
-from routes.auth import require_jwt
+from database import list_files, list_all_files
+from rdb.folders import get_folder, list_folders, create_folder
+from crypto.token import require_jwt
 
 folders_bp = Blueprint('folders', __name__)
+
+class FolderError:
+    FOLDER_NOT_FOUND = 'Folder not found'
+    UNAUTHORIZED_ACCESS = 'Unauthorized access to folder'
+    MISSING_REQUIRED_FIELD = 'Missing required field'
 
 @folders_bp.route('/folders', methods=['POST'])
 @require_jwt
@@ -12,11 +18,11 @@ def create_folder_route():
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': 'No JSON payload provided'}), 400
+            return jsonify({'error': FolderError.MISSING_REQUIRED_FIELD}), 400
             
         # Validate required fields
         if 'name' not in data:
-            return jsonify({'error': 'Missing required field: name'}), 400
+            return jsonify({'error': FolderError.MISSING_REQUIRED_FIELD}), 400
             
         name = data['name']
         parent_id = data.get('parent_id')  # Optional
