@@ -33,12 +33,9 @@ def create_folder_route():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@folders_bp.route('/folders', methods=['GET', 'OPTIONS'])
+@folders_bp.route('/folders', methods=['GET'])
 @require_jwt
 def list_folders_route():
-    if request.method == 'OPTIONS':
-        return '', 204
-        
     try:
         # Get parent_id from query parameters
         parent_id = request.args.get('parent_id')
@@ -122,8 +119,84 @@ def list_contents(folder_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@folders_bp.route('/folders/<folder_id>/info', methods=['GET'])
+@require_jwt
+def get_folder_info(folder_id):
+    try:
+        folder = get_folder(folder_id)
+        if not folder:
+            return jsonify({'error': 'Folder not found'}), 404
+        
+        # Check if the folder belongs to the user
+        if folder['user_id'] != g.user['user_id']:
+            return jsonify({'error': 'Unauthorized access to folder'}), 403
+        
+        # Get files and folders in this folder for the current user
+        files = list_files(parent_id=folder_id, user_id=g.user['user_id'])
+        folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
+        
+        # Get all sub folders and files recursively
+        sub_folders = []
+        sub_files = []
+        for folder in folders:
+            sub_folder = get_folder(folder['id'])
+            if sub_folder:
+                sub_folders.append(sub_folder)
+                sub_sub_folders = list_folders(parent_id=sub_folder['id'], user_id=g.user['user_id'])
+                sub_sub_files = list_files(parent_id=sub_folder['id'], user_id=g.user['user_id'])
+                sub_folders += sub_sub_folders
+                sub_files += sub_sub_files
+        
+        # Calculate folder size
+        folder_size = sum(file['file_size'] for file in files) + sum(file['file_size'] for file in sub_files)
+        
+        return jsonify({
+            'folder_id': folder_id,
+            'folder_size': folder_size,
+            'num_folders': len(folders),
+            'num_sub_folders': len(sub_folders),
+            'num_files': len(files),
+            'num_sub_files': len(sub_files)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@folders_bp.route('/folders/<folder_id>', methods=['DELETE'])
+@require_jwt
+def delete_folder(folder_id):
+    try:
+        folder = get_folder(folder_id)
+        if not folder:
+            return jsonify({'error': 'Folder not found'}), 404
+        
+        # Check if the folder belongs to the user
+        if folder['user_id'] != g.user['user_id']:
+            return jsonify({'error': 'Unauthorized access to folder'}), 403
+        
+        def delete_folder_contents(folder_id):
+            """Delete all files and folders in the given folder."""
+            files = list_files(parent_id=folder_id)
+            folders = list_folders(parent_id=folder_id)
+            for file in files:
+                delete_file(file['id'])
+            for folder in folders:
+                delete_folder_contents(folder['id'])
+                delete_folder(folder['id'])
+        
+        delete_folder_contents(folder_id)
+        delete_file(folder_id)
+        
+        return '', 204
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+    
 @folders_bp.route('/debug/files', methods=['GET'])
 @require_jwt
+
 def debug_files():
     """Debug endpoint to list all files with their user_ids."""
     try:
