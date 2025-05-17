@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from rdb.files import list_files, list_all_files
-from rdb.folders import get_folder, list_folders, create_folder
+from rdb.folders import get_folder, list_folders, create_folder, list_all_folders
 from crypto.token import require_jwt
 
 folders_bp = Blueprint('folders', __name__)
@@ -47,7 +47,7 @@ def list_folders_route():
         parent_id = request.args.get('parent_id')
         
         # List folders for the current user
-        folders = list_folders(parent_id=parent_id, user_id=g.user['user_id'])
+        folders = list_all_folders(user_id=g.user['user_id'])
         return jsonify({'folders': folders})
         
     except Exception as e:
@@ -88,7 +88,7 @@ def list_contents(folder_id):
                     'user_id': g.user['user_id']
                 },
                 'parent': None,
-                'files': list_files(user_id=g.user['user_id']),
+                'files': list_files(user_id=g.user['user_id'], private_key=g.user['private_key']),
                 'folders': list_folders(None, user_id=g.user['user_id'])
             })
             
@@ -103,7 +103,7 @@ def list_contents(folder_id):
             parent = get_folder(folder['parent_id'], g.user['user_id'])
             
         # Get files and folders in this folder for the current user
-        files = list_files(parent_id=folder_id, user_id=g.user['user_id'])
+        files = list_files(parent_id=folder_id, user_id=g.user['user_id'], private_key=g.user['private_key'])
         folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
         
         return jsonify({
@@ -131,8 +131,8 @@ def delete_folder(folder_id):
         
         def delete_folder_contents(folder_id):
             """Delete all files and folders in the given folder."""
-            files = list_files(parent_id=folder_id)
-            folders = list_folders(parent_id=folder_id)
+            files = list_files(parent_id=folder_id, user_id=g.user['user_id'], private_key=g.user['private_key'])
+            folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
             for file in files:
                 delete_file(file['id'])
             for folder in folders:
