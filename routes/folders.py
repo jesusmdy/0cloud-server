@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g
-from database import list_files, list_all_files
+from rdb.files import list_files, list_all_files
 from rdb.folders import get_folder, list_folders, create_folder
 from crypto.token import require_jwt
 
@@ -60,13 +60,13 @@ def get_folder_route(folder_id):
         return '', 204
         
     try:
-        folder = get_folder(folder_id)
+        folder = get_folder(folder_id, g.user['user_id'])
         if not folder:
-            return jsonify({'error': 'Folder not found'}), 404
+            return jsonify({'error': FolderError.FOLDER_NOT_FOUND}), 404
             
         # Check if the folder belongs to the user
         if folder['user_id'] != g.user['user_id']:
-            return jsonify({'error': 'Unauthorized access to folder'}), 403
+            return jsonify({'error': FolderError.UNAUTHORIZED_ACCESS}), 403
             
         return jsonify(folder)
         
@@ -88,28 +88,19 @@ def list_contents(folder_id):
                     'user_id': g.user['user_id']
                 },
                 'parent': None,
-                'files': list_files(parent_id=None, user_id=g.user['user_id']),
-                'folders': list_folders(parent_id=None, user_id=g.user['user_id'])
+                'files': list_files(user_id=g.user['user_id']),
+                'folders': list_folders(None, user_id=g.user['user_id'])
             })
             
         # Get folder details
-        folder = get_folder(folder_id)
+        folder = get_folder(folder_id, g.user['user_id'])
         if not folder:
             return jsonify({'error': 'Folder not found'}), 404
-            
-        # Check if the folder belongs to the user
-        print(f"Folder: {folder}")
-        print(f"User ID: {g.user['user_id']}")
-        if folder['user_id'] != g.user['user_id']:
-            return jsonify({'error': 'Unauthorized access to folder'}), 403
             
         # Get parent folder if exists
         parent = None
         if folder['parent_id']:
-            parent = get_folder(folder['parent_id'])
-            # Check if parent folder belongs to the user
-            if parent and parent['user_id'] != g.user['user_id']:
-                parent = None  # Don't show parent if not owned by user
+            parent = get_folder(folder['parent_id'], g.user['user_id'])
             
         # Get files and folders in this folder for the current user
         files = list_files(parent_id=folder_id, user_id=g.user['user_id'])
@@ -120,49 +111,6 @@ def list_contents(folder_id):
             'parent': parent,
             'files': files,
             'folders': folders
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@folders_bp.route('/folders/<folder_id>/info', methods=['GET'])
-@require_jwt
-def get_folder_info(folder_id):
-    try:
-        folder = get_folder(folder_id)
-        if not folder:
-            return jsonify({'error': 'Folder not found'}), 404
-        
-        # Check if the folder belongs to the user
-        if folder['user_id'] != g.user['user_id']:
-            return jsonify({'error': 'Unauthorized access to folder'}), 403
-        
-        # Get files and folders in this folder for the current user
-        files = list_files(parent_id=folder_id, user_id=g.user['user_id'])
-        folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
-        
-        # Get all sub folders and files recursively
-        sub_folders = []
-        sub_files = []
-        for folder in folders:
-            sub_folder = get_folder(folder['id'])
-            if sub_folder:
-                sub_folders.append(sub_folder)
-                sub_sub_folders = list_folders(parent_id=sub_folder['id'], user_id=g.user['user_id'])
-                sub_sub_files = list_files(parent_id=sub_folder['id'], user_id=g.user['user_id'])
-                sub_folders += sub_sub_folders
-                sub_files += sub_sub_files
-        
-        # Calculate folder size
-        folder_size = sum(file['file_size'] for file in files) + sum(file['file_size'] for file in sub_files)
-        
-        return jsonify({
-            'folder_id': folder_id,
-            'folder_size': folder_size,
-            'num_folders': len(folders),
-            'num_sub_folders': len(sub_folders),
-            'num_files': len(files),
-            'num_sub_files': len(sub_files)
         })
         
     except Exception as e:
@@ -179,7 +127,7 @@ def delete_folder(folder_id):
         
         # Check if the folder belongs to the user
         if folder['user_id'] != g.user['user_id']:
-            return jsonify({'error': 'Unauthorized access to folder'}), 403
+            return jsonify({'error': FolderError.UNAUTHORIZED_ACCESS}), 403
         
         def delete_folder_contents(folder_id):
             """Delete all files and folders in the given folder."""

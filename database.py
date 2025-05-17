@@ -86,7 +86,7 @@ def save_file(encrypted_filename: str, original_filename: str, encrypted_content
     file_id = str(uuid.uuid4())
     
     # Get current timestamp
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.now()
     
     # Save encrypted content to disk
     save_encrypted_file(file_id, encrypted_content)

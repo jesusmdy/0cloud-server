@@ -1,11 +1,7 @@
 from flask import Blueprint, request, jsonify, g
 import uuid
-from datetime import datetime
-import os
 from cryptography.fernet import Fernet
-import base64
-from file_tools import load_key
-from database import save_file
+from rdb.files import save_file
 import mimetypes
 from crypto.token import require_jwt
 
@@ -54,8 +50,8 @@ def encrypt_file():
             original_filename=original_filename,
             encrypted_content=encrypted_content,
             file_size=len(file_content),
-            user_id=g.user['user_id'],  # Get user_id from JWT token
-            parent_id=parent_id,
+            user_id=g.user['user_id'],
+            parent_id=parent_id if parent_id else "",
             mime_type=mime_type
         )
         

@@ -16,8 +16,8 @@ def create_jwt_token(user_id: str, email: str, display_name: str, private_key: s
         'user_id': user_id,
         'email': email,
         'display_name': display_name,
-        'exp': datetime.now(datetime.timezone.utc) + JWT_EXPIRATION,
-        'iat': datetime.now(datetime.timezone.utc),  # Issued at time
+        'exp': datetime.now() + JWT_EXPIRATION,
+        'iat': datetime.now(),  # Issued at time
         'iss': 'crypi-api'  # Issuer
     }
     if private_key:
@@ -56,7 +56,7 @@ def require_jwt(f):
         try:
             # Decode the token
             data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            
+
             # Verify user exists in database
             if not user_exists(data['user_id']):
                 return jsonify({'error': 'User not found'}), 401

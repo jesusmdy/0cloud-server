@@ -11,6 +11,7 @@ class LoginError:
     INVALID_EMAIL_OR_PASSWORD = 'Invalid email or password'
     EMAIL_ALREADY_REGISTERED = 'Email already registered'
     MISSING_REQUIRED_FIELD = 'Missing required field'
+    SERVER_ERROR = 'Server error'
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
@@ -103,8 +104,9 @@ def login():
                         'display_name': user_data['display_name']
                     }
                 })
-        except:
-            return jsonify({'error': LoginError.INVALID_EMAIL_OR_PASSWORD}), 401
+        except Exception as e:
+            print(f"Login error: {str(e)}")  # Debug print
+            return jsonify({'error': LoginError.SERVER_ERROR}), 500
         
     except Exception as e:
         print(f"Login error: {str(e)}")  # Debug print
