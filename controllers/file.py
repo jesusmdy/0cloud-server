@@ -2,19 +2,26 @@ from cryptography.fernet import Fernet
 import os
 import base64
 from utils.transformations import redis_to_dict
-from redis_client import REDIS_CLIENT
 import json
 from uuid import uuid4
 from datetime import datetime
 import mimetypes
 from crypto.files import generate_encrypted_thumbnails
 from werkzeug.datastructures import FileStorage
-from controllers.folder import Folder
+from controllers.folder import FolderController
 from controllers.database import Database
 
 class FileController:
     ENCRYPTED_FILES_DIR = 'encrypted_files'
-    os.makedirs(ENCRYPTED_FILES_DIR, exist_ok=True)
+    
+    def __init__(self):
+        os.makedirs(FileController.ENCRYPTED_FILES_DIR, exist_ok=True)
+    
+    class Errors:
+        FILE_NOT_FOUND = 'File not found'
+        UNAUTHORIZED_ACCESS = 'Unauthorized access to file'
+        NO_PRIVATE_KEY = 'No private key found in token'
+        DECRYPTION_FAILED = 'Decryption failed'
     
     def save_file(
         file: FileStorage,
@@ -44,7 +51,7 @@ class FileController:
         created_at = FileController.Utils.generate_file_creation_date()
 
         if parent_id:
-            parent_folder = Folder.get_folder(parent_id, user_id)
+            parent_folder = FolderController.get_folder(parent_id, user_id)
             if not parent_folder:
                 raise Exception(f"Parent folder {parent_id} does not exist for user {user_id}.")
         else:
@@ -71,12 +78,6 @@ class FileController:
 
         return saved_file
 
-    class Errors:
-        FILE_NOT_FOUND = 'File not found'
-        UNAUTHORIZED_ACCESS = 'Unauthorized access to file'
-        NO_PRIVATE_KEY = 'No private key found in token'
-        DECRYPTION_FAILED = 'Decryption failed'
-        
     class Storage:
         
         def save_encrypted_file(file_id: str, encrypted_content: bytes) -> str:

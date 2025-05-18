@@ -1,9 +1,7 @@
 from controllers.database import Database
 from controllers.crypto import CryptoController
 from controllers.token import TokenController
-from crypto.keys import generate_key_from_password
 import re
-import base64
 from datetime import datetime
 
 class UserController:
@@ -157,12 +155,12 @@ class UserController:
             user_id = Database.Utils.gen_uuid()
             created_at = Database.Utils.gen_timestamp()
             
-            encrypted_private_key_with_salt, password_hash = CryptoController.Misc.gen_user_crypto(password)
+            private_key_hash, password_hash = CryptoController.Misc.gen_user_crypto(password)
             
             UserController.Set.set_user(
                 email,
                 password_hash,
-                encrypted_private_key_with_salt,
+                private_key_hash,
                 display_name,
                 user_id,
                 created_at

@@ -1,8 +1,6 @@
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from controllers.fernet import FernetController
-from cryptography.fernet import Fernet
-from crypto.keys import generate_key_from_password
 
 import base64
 import os
