@@ -1,7 +1,6 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from routes import api_bp
-from database import init_db
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -14,9 +13,6 @@ CORS(app, resources={
         "max_age": 3600
     }
 })
-
-# Initialize database
-init_db()
 
 # Register blueprints
 app.register_blueprint(api_bp)

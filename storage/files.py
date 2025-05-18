@@ -17,6 +17,12 @@ def get_encrypted_file(file_id: str) -> bytes:
     with open(file_path, 'rb') as f:
         return f.read()
 
+def get_encrypted_file_by_filename(filename: str) -> bytes:
+    """Read encrypted file from disk."""
+    file_path = os.path.join(ENCRYPTED_FILES_DIR, filename)
+    with open(file_path, 'rb') as f:
+        return f.read()
+
 def delete_encrypted_file(file_id: str):
     """Delete encrypted file from disk."""
     file_path = os.path.join(ENCRYPTED_FILES_DIR, f"{file_id}.enc")

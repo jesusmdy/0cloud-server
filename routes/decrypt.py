@@ -1,132 +1,84 @@
-from flask import Blueprint, request, jsonify, g
-from database import get_file_by_id
-import base64
-import traceback
-import os
-from cryptography.fernet import Fernet
-from crypto.token import require_jwt
+from flask import Blueprint, jsonify, g
+from controllers.token import TokenController
+from controllers.file import FileController
 
 decrypt_bp = Blueprint('decrypt', __name__)
 
-@decrypt_bp.route('/files/decrypt', methods=['POST'])
-@require_jwt
-def decrypt():
-    if request.method == 'OPTIONS':
-        return '', 204
-        
-    try:
-        # Get JSON payload
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No JSON payload provided'}), 400
-            
-        # Validate required fields
-        required_fields = ['id']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-                
-        # Get file from database
-        file_id = data['id']
-        file = get_file_by_id(file_id)
-        
-        if not file:
-            return jsonify({'error': 'File not found'}), 404
-            
-        # Check if the file belongs to the user
-        if file['user_id'] != g.user['user_id']:
-            return jsonify({'error': 'Unauthorized access to file'}), 403
-            
-        # Get the private key from the JWT token
-        private_key = g.user.get('private_key')
-        if not private_key:
-            return jsonify({'error': 'No private key found in token'}), 401
-            
-        # Decrypt the content using the user's private key
-        try:
-            f = Fernet(private_key.encode())
-            decrypted_content = f.decrypt(file['encrypted_content'])
-        except Exception as e:
-            return jsonify({'error': f'Decryption failed: {str(e)}'}), 400
-        
-        # Convert decrypted content to base64
-        try:
-            decrypted_base64 = base64.b64encode(decrypted_content).decode('utf-8')
-        except Exception as e:
-            return jsonify({'error': f'Failed to encode decrypted content: {str(e)}'}), 500
-        
-        # Convert file object to be JSON serializable
-        serializable_file = {
-            'id': file['id'],
-            'encrypted_filename': file['encrypted_filename'],
-            'original_filename': file['original_filename'],
-            'file_size': file['file_size'],
-            'mime_type': file['mime_type'],
-            'parent_id': file['parent_id'],
-            'created_at': file['created_at']
-        }
-        
-        return jsonify({
-            'file': serializable_file,
-            'content': decrypted_base64
-        })
-        
-    except Exception as e:
-        print(f"Decryption error: {str(e)}")  # Debug print
-        print(f"Traceback: {traceback.format_exc()}")  # Print full traceback
-        return jsonify({'error': str(e)}), 500
+@decrypt_bp.route('/folders/<parent_id>/files/<file_id>', methods=['GET'])
+@TokenController.require_jwt
+def get_file(parent_id, file_id):
+    if not FileController.Validations.is_file_owner(file_id, g.user['user_id'], parent_id):
+        return jsonify({'error': FileController.Errors.UNAUTHORIZED_ACCESS}), 403
     
-@decrypt_bp.route('/files/decrypt/<file_id>', methods=['GET'])
-@require_jwt
-def decrypt_by_id(file_id):
+    file = FileController.Database.get_file_by_id(file_id, g.user['user_id'], parent_id)
+    return jsonify(file)
+
+@decrypt_bp.route('/folders/<parent_id>/files/<file_id>/decrypt', methods=['POST'])
+@TokenController.require_jwt
+def decrypt_file(parent_id, file_id):
+    if not FileController.Validations.is_file_owner(file_id, g.user['user_id'], parent_id):
+        return jsonify({'error': FileController.Errors.UNAUTHORIZED_ACCESS}), 403
+    file = FileController.Database.get_file_by_id(file_id, g.user['user_id'], parent_id)
+
+    if not file:
+        return jsonify({'error': FileController.Errors.FILE_NOT_FOUND}), 404
+
+    private_key = g.user.get('private_key')
+    if not private_key:
+        return jsonify({'error': FileController.Errors.NO_PRIVATE_KEY}), 401
+    
     try:
-                
-        # Get file from database
-        file = get_file_by_id(file_id)
-        
-        if not file:
-            return jsonify({'error': 'File not found'}), 404
-            
-        # Check if the file belongs to the user
-        if file['user_id'] != g.user['user_id']:
-            return jsonify({'error': 'Unauthorized access to file'}), 403
-            
-        # Get the private key from the JWT token
-        private_key = g.user.get('private_key')
-        if not private_key:
-            return jsonify({'error': 'No private key found in token'}), 401
-            
-        # Decrypt the content using the user's private key
-        try:
-            f = Fernet(private_key.encode())
-            decrypted_content = f.decrypt(file['encrypted_content'])
-        except Exception as e:
-            return jsonify({'error': f'Decryption failed: {str(e)}'}), 400
-        
-        # Convert decrypted content to base64
-        try:
-            decrypted_base64 = base64.b64encode(decrypted_content).decode('utf-8')
-        except Exception as e:
-            return jsonify({'error': f'Failed to encode decrypted content: {str(e)}'}), 500
-        
-        # Convert file object to be JSON serializable
-        serializable_file = {
-            'id': file['id'],
-            'encrypted_filename': file['encrypted_filename'],
-            'original_filename': file['original_filename'],
-            'file_size': file['file_size'],
-            'mime_type': file['mime_type'],
-            'parent_id': file['parent_id'],
-            'created_at': file['created_at']
-        }
-        
-        return jsonify({
-            'file': serializable_file,
-            'content': decrypted_base64
-        })
-        
+        encrypted_content = FileController.Storage.get_encrypted_file(file_id)
     except Exception as e:
-        print(f"Decryption error: {str(e)}")  # Debug print
-        print(f"Traceback: {traceback.format_exc()}")  # Print full traceback
-        return jsonify({'error': str(e)}), 500
+        print(e)
+        return jsonify({'error': FileController.Errors.FILE_NOT_FOUND}), 404
+
+    try:
+        decrypted_content = FileController.Storage.decrypt_file_content(encrypted_content, private_key)
+    except Exception as e:
+        print(e)
+        return jsonify({'error': FileController.Errors.DECRYPTION_FAILED}), 400
+
+    try:
+        decrypted_base64 = FileController.Encoders.encode_base64(decrypted_content)
+    except Exception as e:
+        return jsonify({'error': FileController.Errors.DECRYPTION_FAILED}), 400
+    
+    return jsonify({
+        'file': file,
+        'content': decrypted_base64
+    })
+
+@decrypt_bp.route('/thumbnails/<file_id>/<size>', methods=['GET'])
+@TokenController.require_jwt
+def get_thumbnail(file_id, size):
+   thumbs = FileController.Database.get_file_thumbs(file_id, g.user['user_id'])
+   return jsonify(thumbs[size])
+
+@decrypt_bp.route('/thumbnails/<file_id>/<size>/preview', methods=['GET'])
+@TokenController.require_jwt
+def decrypt_thumbnail(file_id, size):
+    
+    thumbs = FileController.Database.get_file_thumbs(file_id, g.user['user_id'])
+    private_key = g.user.get('private_key')
+    if not private_key:
+        return jsonify({'error': FileController.Errors.NO_PRIVATE_KEY}), 401
+
+    selected_thumb = thumbs[size]
+    
+    encrypted_content = FileController.Storage.get_encrypted_file_by_filename(selected_thumb['encrypted_filename'])
+    if not encrypted_content:
+        return jsonify({'error': FileController.Errors.FILE_NOT_FOUND}), 404
+    
+    try:
+        decrypted_content = FileController.Storage.decrypt_file_content(encrypted_content, private_key)
+    except Exception as e:
+        print(e)
+        return jsonify({'error': FileController.Errors.DECRYPTION_FAILED}), 400
+    
+    try:
+        decrypted_base64 = FileController.Encoders.encode_base64(decrypted_content)
+    except Exception as e:
+        return jsonify({'error': FileController.Errors.DECRYPTION_FAILED}), 500
+    
+    return f"data:{selected_thumb['mime_type']};base64,{decrypted_base64}"

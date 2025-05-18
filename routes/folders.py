@@ -1,34 +1,26 @@
 from flask import Blueprint, request, jsonify, g
-from rdb.files import list_files, list_all_files
-from rdb.folders import get_folder, list_folders, create_folder
-from crypto.token import require_jwt
+from controllers.token import TokenController
+from controllers.folder import FolderController
+from controllers.file import FileController
 
 folders_bp = Blueprint('folders', __name__)
 
-class FolderError:
-    FOLDER_NOT_FOUND = 'Folder not found'
-    UNAUTHORIZED_ACCESS = 'Unauthorized access to folder'
-    MISSING_REQUIRED_FIELD = 'Missing required field'
-
 @folders_bp.route('/folders', methods=['POST'])
-@require_jwt
+@TokenController.require_jwt
 def create_folder_route():
     try:
-        # Get JSON payload
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': FolderError.MISSING_REQUIRED_FIELD}), 400
+            return jsonify({'error': FolderController.Errors.MISSING_REQUIRED_FIELD}), 400
             
-        # Validate required fields
         if 'name' not in data:
-            return jsonify({'error': FolderError.MISSING_REQUIRED_FIELD}), 400
+            return jsonify({'error': FolderController.Errors.MISSING_REQUIRED_FIELD}), 400
             
         name = data['name']
-        parent_id = data.get('parent_id')  # Optional
+        parent_id = data.get('parent_id')
         
-        # Create the folder with the user's ID from the JWT token
-        folder_data = create_folder(
+        folder_data = FolderController.create_folder(
             name=name,
             user_id=g.user['user_id'],
             parent_id=parent_id
@@ -40,33 +32,30 @@ def create_folder_route():
         return jsonify({'error': str(e)}), 500
 
 @folders_bp.route('/folders', methods=['GET'])
-@require_jwt
+@TokenController.require_jwt
 def list_folders_route():
     try:
-        # Get parent_id from query parameters
         parent_id = request.args.get('parent_id')
         
-        # List folders for the current user
-        folders = list_folders(parent_id=parent_id, user_id=g.user['user_id'])
+        folders = FolderController.list_all_folders(user_id=g.user['user_id'])
         return jsonify({'folders': folders})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @folders_bp.route('/folders/<folder_id>', methods=['GET', 'OPTIONS'])
-@require_jwt
+@TokenController.require_jwt
 def get_folder_route(folder_id):
     if request.method == 'OPTIONS':
         return '', 204
         
     try:
-        folder = get_folder(folder_id, g.user['user_id'])
+        folder = FolderController.get_folder(folder_id, g.user['user_id'])
         if not folder:
-            return jsonify({'error': FolderError.FOLDER_NOT_FOUND}), 404
+            return jsonify({'error': FolderController.Errors.FOLDER_NOT_FOUND}), 404
             
-        # Check if the folder belongs to the user
         if folder['user_id'] != g.user['user_id']:
-            return jsonify({'error': FolderError.UNAUTHORIZED_ACCESS}), 403
+            return jsonify({'error': FolderController.Errors.UNAUTHORIZED_ACCESS}), 403
             
         return jsonify(folder)
         
@@ -74,10 +63,9 @@ def get_folder_route(folder_id):
         return jsonify({'error': str(e)}), 500
 
 @folders_bp.route('/folders/<folder_id>/contents', methods=['GET'])
-@require_jwt
+@TokenController.require_jwt
 def list_contents(folder_id):
     try:
-        # Handle root folder (folder_id = 0)
         if folder_id == '0':
             return jsonify({
                 'folder': {
@@ -88,23 +76,20 @@ def list_contents(folder_id):
                     'user_id': g.user['user_id']
                 },
                 'parent': None,
-                'files': list_files(user_id=g.user['user_id']),
-                'folders': list_folders(None, user_id=g.user['user_id'])
+                'files': FileController.Database.list_files(user_id=g.user['user_id']),
+                'folders': FolderController.list_folders(None, user_id=g.user['user_id'])
             })
             
-        # Get folder details
-        folder = get_folder(folder_id, g.user['user_id'])
+        folder = FolderController.get_folder(folder_id, g.user['user_id'])
         if not folder:
-            return jsonify({'error': 'Folder not found'}), 404
+            return jsonify({'error': FolderController.Errors.FOLDER_NOT_FOUND}), 404
             
-        # Get parent folder if exists
         parent = None
         if folder['parent_id']:
-            parent = get_folder(folder['parent_id'], g.user['user_id'])
+            parent = FolderController.get_folder(folder['parent_id'], g.user['user_id'])
             
-        # Get files and folders in this folder for the current user
-        files = list_files(parent_id=folder_id, user_id=g.user['user_id'])
-        folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
+        files = FileController.Database.list_files(parent_id=folder_id, user_id=g.user['user_id'])
+        folders = FolderController.list_folders(parent_id=folder_id, user_id=g.user['user_id'])
         
         return jsonify({
             'folder': folder,
@@ -118,21 +103,19 @@ def list_contents(folder_id):
 
 
 @folders_bp.route('/folders/<folder_id>', methods=['DELETE'])
-@require_jwt
+@TokenController.require_jwt
 def delete_folder(folder_id):
     try:
-        folder = get_folder(folder_id)
+        folder = FolderController.get_folder(folder_id, g.user['user_id'])
         if not folder:
-            return jsonify({'error': 'Folder not found'}), 404
+            return jsonify({'error': FolderController.Errors.FOLDER_NOT_FOUND}), 404
         
-        # Check if the folder belongs to the user
         if folder['user_id'] != g.user['user_id']:
-            return jsonify({'error': FolderError.UNAUTHORIZED_ACCESS}), 403
+            return jsonify({'error': FolderController.Errors.UNAUTHORIZED_ACCESS}), 403
         
         def delete_folder_contents(folder_id):
-            """Delete all files and folders in the given folder."""
-            files = list_files(parent_id=folder_id)
-            folders = list_folders(parent_id=folder_id)
+            files = FileController.Database.list_files(parent_id=folder_id, user_id=g.user['user_id'])
+            folders = FolderController.list_folders(parent_id=folder_id, user_id=g.user['user_id'])
             for file in files:
                 delete_file(file['id'])
             for folder in folders:
@@ -146,18 +129,3 @@ def delete_folder(folder_id):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
-    
-@folders_bp.route('/debug/files', methods=['GET'])
-@require_jwt
-
-def debug_files():
-    """Debug endpoint to list all files with their user_ids."""
-    try:
-        files = list_all_files()
-        return jsonify({
-            'files': files,
-            'current_user_id': g.user['user_id']
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500 

@@ -48,6 +48,6 @@ def list_folders(parent_id: str = None, user_id: str = None) -> list:
 
 def list_all_folders(user_id: str = None) -> list:
     """List all folders with optional parent filtering"""
-    folders = REDIS_CLIENT.keys(f"user:{user_id}:folders:{parent_id or 'root'}")
+    folders = REDIS_CLIENT.keys(f"user:{user_id}:folders:*")
     return [get_direct_folder(folder_id) for folder_id in folders]
 

@@ -1,21 +1,19 @@
-from flask import Blueprint, request, jsonify, g
-from rdb.files import count_user_filesize
-from crypto.token import require_jwt
-from rdb.user import get_user
+from flask import Blueprint, jsonify, g
+from controllers.file import FileController
+from controllers.token import TokenController
+from controllers.user import UserController
 import os
 
 user_bp = Blueprint('user', __name__)
 
 @user_bp.route('/user', methods=['GET'])
-@require_jwt
+@TokenController.require_jwt
 def me():
     try:
 
         token_user_id = g.user['user_id']
 
-        user = get_user(token_user_id)
-
-        print(user)
+        user = UserController.Get.by_id(token_user_id)
 
         return jsonify({
             'user_id': user['id'],
@@ -23,7 +21,7 @@ def me():
             'email': user['email'],
             'display_name': user['display_name'],
             'storage': {
-                'allocated': count_user_filesize(user['id']),
+                'allocated': FileController.Database.count_user_filesize(user['id']),
                 'available': os.getenv('total_storage', 107374182400),
             }
         })

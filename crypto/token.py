@@ -4,7 +4,7 @@ from file_tools import load_key
 from datetime import timedelta
 from functools import wraps
 from flask import request, jsonify, g
-from rdb.user import user_exists
+from controllers.user import UserController
 
 JWT_SECRET = load_key()  # Load the JWT signing key
 JWT_ALGORITHM = 'HS256'
@@ -58,7 +58,7 @@ def require_jwt(f):
             data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
             # Verify user exists in database
-            if not user_exists(data['user_id']):
+            if not UserController.Get.by_id(data['user_id']):
                 return jsonify({'error': 'User not found'}), 401
                 
             # Store user data in g for use in routes
