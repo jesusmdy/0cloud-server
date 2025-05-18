@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, g
 from rdb.files import count_user_filesize
 from crypto.token import require_jwt
-from rdb.user import get_user
+from controllers.user import UserController
 import os
 
 user_bp = Blueprint('user', __name__)
@@ -13,9 +13,7 @@ def me():
 
         token_user_id = g.user['user_id']
 
-        user = get_user(token_user_id)
-
-        print(user)
+        user = UserController.Get.by_id(token_user_id)
 
         return jsonify({
             'user_id': user['id'],

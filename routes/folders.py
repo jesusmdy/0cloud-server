@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify, g
 from rdb.files import list_files, list_all_files
 from rdb.folders import get_folder, list_folders, create_folder, list_all_folders
 from crypto.token import require_jwt
+from controllers.folder import Folder
+from controllers.file import FileController
 
 folders_bp = Blueprint('folders', __name__)
 
@@ -28,7 +30,7 @@ def create_folder_route():
         parent_id = data.get('parent_id')  # Optional
         
         # Create the folder with the user's ID from the JWT token
-        folder_data = create_folder(
+        folder_data = Folder.create_folder(
             name=name,
             user_id=g.user['user_id'],
             parent_id=parent_id
@@ -88,8 +90,8 @@ def list_contents(folder_id):
                     'user_id': g.user['user_id']
                 },
                 'parent': None,
-                'files': list_files(user_id=g.user['user_id'], private_key=g.user['private_key']),
-                'folders': list_folders(None, user_id=g.user['user_id'])
+                'files': FileController.Database.list_files(user_id=g.user['user_id']),
+                'folders': Folder.list_folders(None, user_id=g.user['user_id'])
             })
             
         # Get folder details
@@ -103,8 +105,8 @@ def list_contents(folder_id):
             parent = get_folder(folder['parent_id'], g.user['user_id'])
             
         # Get files and folders in this folder for the current user
-        files = list_files(parent_id=folder_id, user_id=g.user['user_id'], private_key=g.user['private_key'])
-        folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
+        files = FileController.Database.list_files(parent_id=folder_id, user_id=g.user['user_id'])
+        folders = Folder.list_folders(parent_id=folder_id, user_id=g.user['user_id'])
         
         return jsonify({
             'folder': folder,
@@ -131,8 +133,8 @@ def delete_folder(folder_id):
         
         def delete_folder_contents(folder_id):
             """Delete all files and folders in the given folder."""
-            files = list_files(parent_id=folder_id, user_id=g.user['user_id'], private_key=g.user['private_key'])
-            folders = list_folders(parent_id=folder_id, user_id=g.user['user_id'])
+            files = FileController.Database.list_files(parent_id=folder_id, user_id=g.user['user_id'])
+            folders = Folder.list_folders(parent_id=folder_id, user_id=g.user['user_id'])
             for file in files:
                 delete_file(file['id'])
             for folder in folders:
@@ -146,18 +148,3 @@ def delete_folder(folder_id):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
-    
-@folders_bp.route('/debug/files', methods=['GET'])
-@require_jwt
-
-def debug_files():
-    """Debug endpoint to list all files with their user_ids."""
-    try:
-        files = list_all_files()
-        return jsonify({
-            'files': files,
-            'current_user_id': g.user['user_id']
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500 
