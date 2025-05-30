@@ -1,4 +1,4 @@
-class KeyController:
+class Key:
   class Load:
     def jwt():
       return open("files.key", "rb").read()

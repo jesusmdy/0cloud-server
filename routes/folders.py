@@ -66,7 +66,7 @@ def get_folder_route(folder_id):
 @TokenController.require_jwt
 def list_contents(folder_id):
     try:
-        if folder_id == '0':
+        if folder_id == '0' or folder_id == 'root':
             return jsonify({
                 'folder': {
                     'id': '0',
